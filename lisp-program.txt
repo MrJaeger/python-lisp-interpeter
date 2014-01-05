@@ -1,0 +1,4 @@
+//(quote a)
+//(cdr (cdr (cdr (cdr '(1 2 3)))))
+(car (quote (quote (quote (quote (1 2 3))))))
+//(eq? (/ (+ 2 10) 3) 4)
