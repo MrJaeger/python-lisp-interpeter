@@ -1,5 +1,7 @@
 from lisp import Lisp
 
 f = open('lisp-program.txt', 'r')
+program = ""
 for line in f:
-    print Lisp(line).evaluates_to
+    program += line
+Lisp(program)

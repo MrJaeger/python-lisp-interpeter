@@ -171,7 +171,8 @@ class Lisp:
         'eq?': Functions.equals,
         'quote': Functions.quote,
         'car': Functions.car,
-        'cdr': Functions.cdr
+        'cdr': Functions.cdr,
+        'atom?': Functions.is_atom
     }
 
     def __init__(self, lisp_program, *args, **kwargs):
@@ -182,11 +183,11 @@ class Lisp:
         self.evaluates_to = self.parse_and_evaluate(lisp_program)
 
 
-    def parse_paren_from_symbol(self, symbol):
+    def parse_paren_and_newline_from_symbol(self, symbol):
         new_symbols = []
         current_chars = ''
         for char in symbol:
-            if char == '(' or char == ')':
+            if char == '(' or char == ')' or char == '\n':
                 new_symbols.append(current_chars)
                 new_symbols.append(char)
                 current_chars = ''
@@ -196,11 +197,24 @@ class Lisp:
         return [symbol for symbol in new_symbols if symbol != '']
 
 
-    def separate_parens(self, symbols):
+    def separate_parens_and_newlines(self, symbols):
         new_symbol_list = []
         for symbol in symbols:
-            new_symbol_list += self.parse_paren_from_symbol(symbol)
+            new_symbol_list += self.parse_paren_and_newline_from_symbol(symbol)
         return new_symbol_list
+
+
+    def strip_comments(self, symbols):
+        in_comment = False
+        new_symbols = []
+        for symbol in symbols:
+            if symbol == '//':
+                in_comment = True
+            if not in_comment:
+                new_symbols.append(symbol)
+            if symbol == '\n':
+                in_comment = False
+        return new_symbols
 
 
     def evaluate(self, expression):
@@ -226,7 +240,8 @@ class Lisp:
 
     def parse_and_evaluate(self, lisp_program):
         symbols = lisp_program.split(' ')
-        symbols = self.separate_parens(symbols)
+        symbols = self.separate_parens_and_newlines(symbols)
+        symbols = self.strip_comments(symbols)
         symbols = [symbol for symbol in symbols if symbol != '\n']
         for idx, symbol in enumerate(symbols):
             if symbol == '//':
@@ -252,8 +267,6 @@ class Lisp:
                 elif symbol == '(' and len(self.quote_indexes) > 0:
                     self.quote_paren_counts[-1] += 1
                 self.stack.append(self.Helper.to_correct_literal(symbol))
-
-        try:
-            return self.stack[0]
-        except:
-            return None
+            if len(self.stack) == 1 and '(' not in self.stack:
+                print self.stack[0]
+                self.stack.pop()
