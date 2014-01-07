@@ -2,6 +2,8 @@ import re
 import random
 import string
 
+global_lisp = None
+
 class Helper:
     INTEGER_LITERAL_REGEX = '^-?\d+$'
     FLOAT_LITERAL_REGEX = '^-?\d+.\d+$'
@@ -35,37 +37,37 @@ class Helper:
 class Functions:
     def add(self, operands):
         assert len(operands) == 2
-        return operands[0] + operands[1]
+        return Symbol(operands[0].get_value() + operands[1].get_value())
 
 
     def subtract(self, operands):
         assert len(operands) == 2
-        return operands[0] - operands[1]
+        return Symbol(operands[0].get_value() - operands[1].get_value())
 
 
     def multiply(self, operands):
         assert len(operands) == 2
-        return operands[0] * operands[1]
+        return Symbol(operands[0].get_value() * operands[1].get_value())
 
 
     def divide(self, operands):
         assert len(operands) == 2
-        return operands[0] / operands[1]
+        return Symbol(operands[0].get_value() / operands[1].get_value())
 
 
     def equals(self, operands):
         assert len(operands) == 2
-        return operands[0] == operands[1]
+        return Symbol(operands[0].get_value() == operands[1].get_value())
 
 
     def quote(self, operands):
-        return Symbol(operands)
+        return Symbol(operands, quoted=True)
 
 
     def car(self, operands):
         assert len(operands) == 1
         list_symbol = operands[0]
-        if list_symbol.is_list:
+        if list_symbol.is_list():
             return list_symbol.value[0]
         else:
             raise Exception("You are trying to car something that is not a list")
@@ -75,7 +77,10 @@ class Functions:
         assert len(operands) == 1
         list_symbol = operands[0]
         if list_symbol.is_list:
-            return Symbol(symbols=list_symbol.value[1:], build_symbols=False, is_list=True)
+            return Symbol(list_symbol.value[1:], 
+                    build_symbols=False, 
+                    is_list=True,
+                    quoted=True)
         else:
             raise Exception("You are trying to cdr something that is not a list")
 
@@ -83,56 +88,88 @@ class Functions:
     def is_atom(self, operands):
         assert len(operands) == 1
         symbol = operands[0]
-        if isinstance(symbol, (Sybmol)):
+        if isinstance(symbol, (Symbol)):
             return not symbol.is_list()
         else:
             return True
+
+
+    def define(self, operands):
+        pass
 
 
 
 class Symbol:
     Helper = Helper()
 
-    def __init__(self, symbols=None, build_symbols=True, is_list=False, *args, **kwargs):
+    def __init__(self,  
+                symbols, 
+                build_symbols=True, 
+                is_list=False,
+                quoted=False,
+                *args, 
+                **kwargs):
         symbols = symbols or []
+        self.quoted = quoted
+        self.lisp = global_lisp
         self._is_list = is_list
-        self.name = self.generate_random_symbol_name()
-        if build_symbols:
+        if build_symbols and isinstance(symbols, list) and '(' in symbols:
             self.value = self.build_symbol_list(symbols)
         else:
             self.value = symbols
 
 
     def __str__(self):
-        if len(self.value) == 0:
-            return '\'()'
-        elif len(self.value) == 1 and not self.is_list():
-            return '\'' + str(self.value[0])
-        else:
-            return self.build_unicode(symbols=self.value, display_string='\'')
+        display_string = ''
+        if self.quoted:
+            display_string += '\''
+        if self.is_list():
+            display_string += '('
+        display_string = self.build_unicode(value=self.value, display_string=display_string)
+        if self.is_list():
+            display_string += ')'
+        return display_string
+
+
+    def get_value(self):
+        if isinstance(self.value, basestring):
+            pass
+        return self.value
 
 
     def is_list(self):
-        quoteless_value = [val for val in self.value if val != "\'"]
-        return len(quoteless_value) > 1 or self._is_list
+        if self._is_list:
+            return True
+        if not isinstance(self.value, list):
+            return False
+        else:
+            quoteless_value = [val for val in self.value if val != "\'"]
+            return len(quoteless_value) > 1
 
 
-    def build_unicode(self, symbols, display_string=''):
-        for idx, symbol in enumerate(symbols):
-            if isinstance(symbol, (list)):
-                display_string += '('
-                display_string += self.build_unicode(symbols=symbol)
-                display_string ++ ')'
-            elif isinstance(symbol, (Symbol)):
-                if symbol.is_list():
+    def build_unicode(self, value, display_string=''):
+        if isinstance(value, list):
+            for idx, symbol in enumerate(value):
+                if isinstance(symbol, (list)):
                     display_string += '('
-                display_string += self.build_unicode(symbols=symbol.value)
-                if symbol.is_list():
-                    display_string += ')'
+                    display_string += self.build_unicode(value=symbol)
+                    display_string ++ ')'
+                elif isinstance(symbol, (Symbol)):
+                    if symbol.quoted:
+                        display_string += '\''
+                    if symbol.is_list():
+                        display_string += '('
+                    display_string += self.build_unicode(value=symbol.value)
+                    if idx != (len(value) - 1) and not symbol.is_list():
+                        display_string += ' '
+                    if symbol.is_list():
+                        display_string += ')'
+        else:
+            if isinstance(value, Symbol) and value.quoted:
+                display_string += '\''
+                display_string += value.get_value()
             else:
-                display_string += str(symbol)
-                if idx != (len(symbols) - 1)  and symbol != '\'':
-                    display_string += ' '
+                display_string += str(value)
 
         return display_string
 
@@ -150,13 +187,7 @@ class Symbol:
             elif len(open_paren_indexes) == 0:
                 new_symbols.append(symbol)
         symbol_list = new_symbols[0]
-        if isinstance(symbol_list[0], (Symbol)):
-            symbol_list = ['\'', symbol_list[0]]
         return symbol_list
-
-
-    def generate_random_symbol_name(self):
-        return ''.join(random.choice(string.ascii_letters) for x in range(16))
 
 
 class Lisp:
@@ -172,10 +203,13 @@ class Lisp:
         'quote': Functions.quote,
         'car': Functions.car,
         'cdr': Functions.cdr,
-        'atom?': Functions.is_atom
+        'atom?': Functions.is_atom,
+        'define': Functions.define
     }
 
     def __init__(self, lisp_program, *args, **kwargs):
+        global global_lisp
+        global_lisp = self
         self.symbols = {}
         self.quote_indexes = []
         self.quote_paren_counts = []
@@ -217,6 +251,20 @@ class Lisp:
         return new_symbols
 
 
+    def build_symbols(self, symbols):
+        new_symbols = []
+        non_symbol_chars = ['\'', '(', ')']
+        for symbol in symbols:
+            is_atom = self.FUNCTIONS['atom?']([symbol])
+            is_function = self.FUNCTIONS.has_key(symbol)
+            if is_atom and not is_function and symbol not in non_symbol_chars:
+                new_symbol = Symbol(self.Helper.to_correct_literal(symbol))
+                new_symbols.append(new_symbol)
+            else:
+                new_symbols.append(symbol)
+        return new_symbols
+
+
     def evaluate(self, expression):
         if len(expression) == 1:
             return self.Helper.to_correct_evaluation(expression[0])
@@ -235,7 +283,8 @@ class Lisp:
         last_open_paren_index = self.Helper.find_last_index_of(self.stack, '(')
         to_be_evaluated = self.stack[(last_open_paren_index + 1):]
         self.stack = self.stack[:(last_open_paren_index + 1)]
-        self.stack[last_open_paren_index] = self.Helper.to_correct_literal(self.evaluate(to_be_evaluated))
+        value = self.evaluate(to_be_evaluated)
+        self.stack[last_open_paren_index] = self.Helper.to_correct_literal(value)
 
 
     def parse_and_evaluate(self, lisp_program):
@@ -243,6 +292,7 @@ class Lisp:
         symbols = self.separate_parens_and_newlines(symbols)
         symbols = self.strip_comments(symbols)
         symbols = [symbol for symbol in symbols if symbol != '\n']
+        symbols = self.build_symbols(symbols)
         for idx, symbol in enumerate(symbols):
             if symbol == '//':
                 break
@@ -252,18 +302,20 @@ class Lisp:
                 else:
                     self.quote_paren_counts[-1] -= 1
                     current_paren_count = self.quote_paren_counts[-1]
-                    if current_paren_count == 0:
+                    if current_paren_count >= 0:
                         self.stack.append(self.Helper.to_correct_literal(symbol))
+                    if current_paren_count == 0:
                         quote_index = self.quote_indexes.pop()
-                        new_symbol = Symbol(self.stack[(quote_index + 1):(idx + 1)])
-                        self.stack = self.stack[:(quote_index)] + [new_symbol] + self.stack[(idx + 1):]
+                        new_symbol = self.FUNCTIONS['quote'](self.stack[quote_index:-1])
+                        self.stack = self.stack[:(quote_index - 2)] + [new_symbol]
                         self.quote_paren_counts.pop()
-                    elif current_paren_count == -1:
-                        self.update_stack()
             else:
-                if symbol == '\'' or symbol == 'quote':
-                    self.quote_indexes.append(idx)
+                if symbol == '\'':
+                    self.quote_indexes.append(len(self.stack) + 1)
                     self.quote_paren_counts.append(0)
+                elif  symbol == 'quote':
+                    self.quote_indexes.append(len(self.stack) + 1)
+                    self.quote_paren_counts.append(1)
                 elif symbol == '(' and len(self.quote_indexes) > 0:
                     self.quote_paren_counts[-1] += 1
                 self.stack.append(self.Helper.to_correct_literal(symbol))
