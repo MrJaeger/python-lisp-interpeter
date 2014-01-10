@@ -76,13 +76,7 @@ class Functions:
     def cdr(self, operands):
         assert len(operands) == 1
         list_symbol = operands[0]
-        if list_symbol.is_list:
-            return Symbol(list_symbol.value[1:], 
-                    build_symbols=False, 
-                    is_list=True,
-                    quoted=True)
-        else:
-            raise Exception("You are trying to cdr something that is not a list")
+        return list_symbol.cdr()
 
 
     def is_atom(self, operands):
@@ -105,14 +99,15 @@ class Symbol:
     def __init__(self,  
                 symbols, 
                 build_symbols=True, 
-                is_list=False,
+                make_list=False,
                 quoted=False,
                 *args, 
                 **kwargs):
         symbols = symbols or []
         self.quoted = quoted
         self.lisp = global_lisp
-        self._is_list = is_list
+        if make_list and not isinstance(symbols, list):
+            symbols = [symbols]
         if build_symbols and isinstance(symbols, list) and '(' in symbols:
             self.value = self.build_symbol_list(symbols)
         else:
@@ -131,6 +126,20 @@ class Symbol:
         return display_string
 
 
+    def cdr(self):
+        multi_quoted_list = self.quoted and self.value[0].quoted
+        if self.is_list() or multi_quoted_list:
+            if multi_quoted_list:
+                return self.value[0]
+            else:
+                return Symbol(self.value[1:], 
+                    build_symbols=False, 
+                    make_list=True,
+                    quoted=True)
+        else:
+            raise Exception("You are trying to cdr something that is not a list")
+
+
     def get_value(self):
         if isinstance(self.value, basestring):
             pass
@@ -138,13 +147,9 @@ class Symbol:
 
 
     def is_list(self):
-        if self._is_list:
-            return True
         if not isinstance(self.value, list):
             return False
-        else:
-            quoteless_value = [val for val in self.value if val != "\'"]
-            return len(quoteless_value) > 1
+        return len(self.value) > 1
 
 
     def build_unicode(self, value, display_string=''):
