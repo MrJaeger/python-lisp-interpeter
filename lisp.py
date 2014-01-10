@@ -141,8 +141,6 @@ class Symbol:
 
 
     def get_value(self):
-        if isinstance(self.value, basestring):
-            pass
         return self.value
 
 
