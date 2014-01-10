@@ -300,24 +300,30 @@ class Lisp:
                 if len(self.quote_indexes) == 0:
                     self.update_stack()
                 else:
-                    self.quote_paren_counts[-1] -= 1
+                    self.quote_paren_counts = [(count - 1) for count in self.quote_paren_counts]
                     current_paren_count = self.quote_paren_counts[-1]
                     if current_paren_count >= 0:
                         self.stack.append(self.Helper.to_correct_literal(symbol))
                     if current_paren_count == 0:
                         quote_index = self.quote_indexes.pop()
-                        new_symbol = self.FUNCTIONS['quote'](self.stack[quote_index:-1])
-                        self.stack = self.stack[:(quote_index - 2)] + [new_symbol]
+                        quote_type = self.stack[quote_index]
+                        quote_function = self.FUNCTIONS['quote']
+                        if quote_type == 'quote':
+                            new_symbol = quote_function(self.stack[(quote_index + 1):-1])
+                            self.stack = self.stack[:(quote_index - 1)] + [new_symbol]
+                        elif quote_type == '\'':
+                            new_symbol = quote_function(self.stack[(quote_index + 1):])
+                            self.stack = self.stack[:quote_index] + [new_symbol]
                         self.quote_paren_counts.pop()
             else:
                 if symbol == '\'':
-                    self.quote_indexes.append(len(self.stack) + 1)
+                    self.quote_indexes.append(len(self.stack))
                     self.quote_paren_counts.append(0)
                 elif  symbol == 'quote':
-                    self.quote_indexes.append(len(self.stack) + 1)
+                    self.quote_indexes.append(len(self.stack))
                     self.quote_paren_counts.append(1)
                 elif symbol == '(' and len(self.quote_indexes) > 0:
-                    self.quote_paren_counts[-1] += 1
+                    self.quote_paren_counts = [(count + 1) for count in self.quote_paren_counts]
                 self.stack.append(self.Helper.to_correct_literal(symbol))
             if len(self.stack) == 1 and '(' not in self.stack:
                 print self.stack[0]
