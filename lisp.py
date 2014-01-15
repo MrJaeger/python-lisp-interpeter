@@ -1,5 +1,4 @@
 import re
-import random
 import string
 
 global_lisp = None
@@ -93,6 +92,7 @@ class Functions:
 
     def define(self, operands):
         assert len(operands) == 2
+        global global_lisp
         key = operands[0]
         if isinstance(key, Symbol):
             key = key.get_value(literal=True)
@@ -111,6 +111,7 @@ class Symbol:
                 quoted=False,
                 *args, 
                 **kwargs):
+        global global_lisp
         symbols = symbols or []
         self.quoted = quoted
         self.lisp = global_lisp
