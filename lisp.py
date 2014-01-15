@@ -4,6 +4,9 @@ import string
 
 global_lisp = None
 
+class DefineException(Exception):
+    pass
+
 class Helper:
     INTEGER_LITERAL_REGEX = '^-?\d+$'
     FLOAT_LITERAL_REGEX = '^-?\d+.\d+$'
@@ -89,8 +92,13 @@ class Functions:
 
 
     def define(self, operands):
-        pass
-
+        assert len(operands) == 2
+        key = operands[0]
+        if isinstance(key, Symbol):
+            key = key.get_value(literal=True)
+        value = operands[1]
+        global_lisp.symbols[key] = value
+        raise DefineException()
 
 
 class Symbol:
@@ -140,8 +148,28 @@ class Symbol:
             raise Exception("You are trying to cdr something that is not a list")
 
 
-    def get_value(self):
-        return self.value
+    def get_value(self, literal=False):
+        if self.is_list():
+            return self.value
+        elif isinstance(self.value, list):
+            value = self.value[0]
+        else:
+            value = self.value
+
+        if isinstance(value, basestring) and literal == False:
+            lisp_symbols = self.lisp.symbols
+            try:
+                ret = lisp_symbols[value]
+                if isinstance(ret, Symbol):
+                    return ret.get_value()
+                else:
+                    return ret
+            except:
+                raise Exception("This symbol is not defined")
+        elif isinstance(value, Symbol):
+            return value.get_value()
+        else:
+            return value
 
 
     def is_list(self):
@@ -286,8 +314,11 @@ class Lisp:
         last_open_paren_index = self.Helper.find_last_index_of(self.stack, '(')
         to_be_evaluated = self.stack[(last_open_paren_index + 1):]
         self.stack = self.stack[:(last_open_paren_index + 1)]
-        value = self.evaluate(to_be_evaluated)
-        self.stack[last_open_paren_index] = self.Helper.to_correct_literal(value)
+        try:
+            value = self.evaluate(to_be_evaluated)
+            self.stack[last_open_paren_index] = self.Helper.to_correct_literal(value)
+        except DefineException:
+            self.stack.pop(last_open_paren_index)
 
 
     def parse_and_evaluate(self, lisp_program):
